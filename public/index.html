@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mafia Session Manager</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Mafia Session Manager</h1>
+      <p class="tagline">Distribute roles privately and keep everyone in sync.</p>
+    </header>
+
+    <main class="panels">
+      <section class="panel" id="player-panel">
+        <h2>Player</h2>
+        <p>Join a session with the code from your storyteller.</p>
+        <form id="player-join-form" autocomplete="off">
+          <label>
+            Session Code
+            <input
+              type="text"
+              name="sessionCode"
+              id="player-session-code"
+              maxlength="5"
+              pattern="[A-Za-z0-9]{5}"
+              placeholder="ABCDE"
+              required
+            />
+          </label>
+          <label>
+            Your Name
+            <input
+              type="text"
+              name="playerName"
+              id="player-name-input"
+              maxlength="32"
+              placeholder="Player name"
+              required
+            />
+          </label>
+          <button type="submit">Join game</button>
+        </form>
+        <p class="error" id="player-error" aria-live="polite"></p>
+
+        <div id="player-status" class="card hidden" aria-live="polite">
+          <h3>Welcome, <span id="player-display-name"></span>!</h3>
+          <p>
+            <strong>Role:</strong>
+            <span id="player-role">Waiting for storyteller…</span>
+          </p>
+          <p>
+            <strong>Status:</strong>
+            <span id="player-alive" class="alive">Alive</span>
+          </p>
+          <p class="hint">
+            Keep this page open to receive updates from the storyteller.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" id="host-panel">
+        <h2>Storyteller</h2>
+        <p>Create a new session and share the join code with your players.</p>
+        <form id="host-create-form">
+          <button type="submit">Create new session</button>
+        </form>
+        <p class="error" id="host-error" aria-live="polite"></p>
+
+        <div id="host-details" class="card hidden">
+          <h3>Session details</h3>
+          <p>
+            <strong>Session code:</strong>
+            <span id="host-session-code" class="code"></span>
+          </p>
+          <p>
+            <strong>Host secret:</strong>
+            <span id="host-secret" class="secret"></span>
+          </p>
+          <p class="hint">
+            Keep the host secret private. You'll need it if you reconnect.
+          </p>
+        </div>
+
+        <div id="host-players" class="card hidden">
+          <h3>Players</h3>
+          <p class="hint">
+            Assign roles and toggle life status. Changes are pushed instantly.
+          </p>
+          <div id="players-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Built for quick party game coordination. All session data lives on this
+        server and resets when it restarts.
+      </p>
+    </footer>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
