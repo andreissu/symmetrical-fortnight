@@ -43,6 +43,23 @@ function sendSSE(res, event, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+function getRoster(session) {
+  return Array.from(session.players.values()).map((player) => ({
+    id: player.id,
+    name: player.name,
+    alive: player.alive,
+  }));
+}
+
+function broadcastRoster(session) {
+  const roster = getRoster(session);
+  for (const clients of session.playerClients.values()) {
+    for (const res of clients) {
+      sendSSE(res, 'roster_update', { roster });
+    }
+  }
+}
+
 function broadcastHost(session) {
   const payload = {
     code: session.code,
@@ -56,6 +73,7 @@ function broadcastHost(session) {
   for (const res of session.hostClients) {
     sendSSE(res, 'session_update', payload);
   }
+  broadcastRoster(session);
 }
 
 function broadcastPlayer(session, playerId) {
@@ -184,24 +202,57 @@ async function handleApi(req, res, parsedUrl) {
           sendJson(res, 403, { error: 'Invalid host secret' });
           return;
         }
-        const assignments = body.assignments;
-        if (!Array.isArray(assignments)) {
-          sendJson(res, 400, { error: 'assignments must be an array' });
+        const { assignments, roles } = body;
+        if (Array.isArray(assignments)) {
+          let updated = false;
+          for (const item of assignments) {
+            if (!item || typeof item.playerId !== 'string') continue;
+            const player = session.players.get(item.playerId);
+            if (!player) continue;
+            player.role = typeof item.role === 'string' && item.role.trim() ? item.role.trim() : null;
+            updated = true;
+            broadcastPlayer(session, player.id);
+          }
+          if (updated) {
+            broadcastHost(session);
+          }
+          sendJson(res, 200, { ok: true });
           return;
         }
-        let updated = false;
-        for (const item of assignments) {
-          if (!item || typeof item.playerId !== 'string') continue;
-          const player = session.players.get(item.playerId);
-          if (!player) continue;
-          player.role = typeof item.role === 'string' && item.role.trim() ? item.role.trim() : null;
-          updated = true;
+
+        if (!Array.isArray(roles)) {
+          sendJson(res, 400, { error: 'Provide an assignments array or roles list.' });
+          return;
+        }
+
+        const rolePool = roles
+          .map((role) => (typeof role === 'string' ? role.trim() : ''))
+          .filter((role) => role.length > 0);
+
+        if (rolePool.length === 0) {
+          sendJson(res, 400, { error: 'At least one role is required.' });
+          return;
+        }
+
+        const players = Array.from(session.players.values());
+        if (players.length === 0) {
+          sendJson(res, 400, { error: 'No players joined yet.' });
+          return;
+        }
+
+        const shuffledPlayers = players.slice();
+        for (let i = shuffledPlayers.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+        }
+
+        shuffledPlayers.forEach((player, index) => {
+          const role = rolePool[index] || null;
+          player.role = role;
           broadcastPlayer(session, player.id);
-        }
-        if (updated) {
-          broadcastHost(session);
-        }
-        sendJson(res, 200, { ok: true });
+        });
+        broadcastHost(session);
+        sendJson(res, 200, { ok: true, assigned: Math.min(rolePool.length, players.length) });
       } catch (err) {
         sendJson(res, 400, { error: 'Invalid JSON body' });
       }
@@ -273,6 +324,7 @@ async function handleApi(req, res, parsedUrl) {
         }
       });
       broadcastPlayer(session, playerId);
+      sendSSE(res, 'roster_update', { roster: getRoster(session) });
       return;
     }
 

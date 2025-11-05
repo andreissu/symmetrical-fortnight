@@ -6,7 +6,8 @@ A lightweight web application for running social deduction games like Mafia. It 
 
 - 🎲 **Session creation** – storyteller spins up a unique join code and a private host secret.
 - 🙋 **Player onboarding** – players enter the code and instantly receive their role and status.
-- 🧙 **Role control** – storyteller assigns or updates roles with a couple of taps.
+- 🧙 **Role control** – storyteller enters the role list once and randomises assignments across the table (with manual overrides when needed).
+- 📋 **Shared roster** – every player sees who’s alive or dead without revealing hidden roles.
 - ☠️ **Life tracking** – toggle players between alive/dead states and push updates immediately.
 - ⚡ **Realtime sync** – powered by Server-Sent Events (no external dependencies required).
 

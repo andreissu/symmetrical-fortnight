@@ -6,6 +6,8 @@ const playerRole = document.getElementById('player-role');
 const playerAlive = document.getElementById('player-alive');
 const playerNameInput = document.getElementById('player-name-input');
 const playerSessionCodeInput = document.getElementById('player-session-code');
+const playerRosterCard = document.getElementById('player-roster');
+const playerRosterList = document.getElementById('player-roster-list');
 
 const hostForm = document.getElementById('host-create-form');
 const hostError = document.getElementById('host-error');
@@ -14,6 +16,10 @@ const hostSessionCode = document.getElementById('host-session-code');
 const hostSecretEl = document.getElementById('host-secret');
 const hostPlayersCard = document.getElementById('host-players');
 const playersList = document.getElementById('players-list');
+const roleForm = document.getElementById('role-randomiser-form');
+const rolePoolInput = document.getElementById('role-pool');
+const roleFeedback = document.getElementById('role-feedback');
+const clearRolesButton = document.getElementById('clear-roles');
 
 let playerEventSource = null;
 let hostEventSource = null;
@@ -76,6 +82,8 @@ playerForm.addEventListener('submit', async (event) => {
     playerAlive.classList.remove('dead');
     playerAlive.classList.add('alive');
     playerStatusCard.classList.remove('hidden');
+    playerRosterCard.classList.remove('hidden');
+    renderRoster([]);
 
     playerForm.querySelector('button').disabled = true;
     playerSessionCodeInput.disabled = true;
@@ -125,6 +133,14 @@ function connectPlayerStream() {
       }
     } catch (err) {
       console.error('Failed to parse player event', err);
+    }
+  });
+  playerEventSource.addEventListener('roster_update', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      renderRoster(data.roster || []);
+    } catch (err) {
+      console.error('Failed to parse roster event', err);
     }
   });
   playerEventSource.onerror = () => {
@@ -181,6 +197,84 @@ function connectHostStream() {
   hostEventSource.onerror = () => {
     hostError.textContent = 'Connection lost. Retrying…';
   };
+}
+
+if (roleForm) {
+  roleForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (roleFeedback) {
+      roleFeedback.textContent = '';
+    }
+    hostError.textContent = '';
+
+    if (!hostState.code || !hostState.secret) {
+      hostError.textContent = 'Create a session before assigning roles.';
+      return;
+    }
+
+    if (!rolePoolInput) {
+      hostError.textContent = 'Roles input unavailable. Refresh and try again.';
+      return;
+    }
+
+    const roles = parseRolePool(rolePoolInput.value);
+    if (roles.length === 0) {
+      if (roleFeedback) {
+        roleFeedback.textContent = 'Enter at least one role to randomise.';
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/sessions/${hostState.code}/roles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          hostSecret: hostState.secret,
+          roles,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unable to assign roles.' }));
+        hostError.textContent = error.error || 'Unable to assign roles.';
+        return;
+      }
+      const result = await response.json().catch(() => ({ ok: true }));
+      if (roleFeedback) {
+        if (typeof result.assigned === 'number') {
+          roleFeedback.textContent = `Assigned ${result.assigned} role${
+            result.assigned === 1 ? '' : 's'
+          } randomly.`;
+        } else {
+          roleFeedback.textContent = 'Roles assigned randomly.';
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      hostError.textContent = 'Network error assigning roles.';
+    }
+  });
+}
+
+if (clearRolesButton) {
+  clearRolesButton.addEventListener('click', () => {
+    if (rolePoolInput) {
+      rolePoolInput.value = '';
+    }
+    if (roleFeedback) {
+      roleFeedback.textContent = '';
+    }
+  });
+}
+
+function parseRolePool(value) {
+  if (!value) return [];
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 function renderPlayers(players) {
@@ -284,7 +378,7 @@ async function updateRole(playerId, roleValue) {
 async function updateAlive(playerId, alive) {
   hostError.textContent = '';
   try {
-    const response = await fetch(`/api/sessions/${hostState.code}/players/${playerId}/status`, {
+    const response = await fetch(`/api/sessions/${hostState.code}/players/${playerId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -302,4 +396,41 @@ async function updateAlive(playerId, alive) {
     console.error(err);
     hostError.textContent = 'Network error updating player.';
   }
+}
+
+function renderRoster(roster) {
+  if (!playerRosterCard || !playerRosterList) return;
+  playerRosterList.innerHTML = '';
+  if (!Array.isArray(roster) || roster.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'hint';
+    empty.textContent = 'Waiting for players to join…';
+    playerRosterList.appendChild(empty);
+    return;
+  }
+
+  roster.forEach((entry) => {
+    const item = document.createElement('li');
+    item.className = `roster-item ${entry.alive ? 'alive' : 'dead'}`;
+    if (entry.id === playerState.playerId) {
+      item.classList.add('you');
+    }
+
+    const name = document.createElement('span');
+    name.className = 'label';
+    name.textContent = entry.name;
+    if (entry.id === playerState.playerId) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = 'You';
+      name.appendChild(badge);
+    }
+
+    const status = document.createElement('span');
+    status.textContent = entry.alive ? 'Alive' : 'Dead';
+
+    item.appendChild(name);
+    item.appendChild(status);
+    playerRosterList.appendChild(item);
+  });
 }

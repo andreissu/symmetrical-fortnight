@@ -57,6 +57,10 @@
           <p class="hint">
             Keep this page open to receive updates from the storyteller.
           </p>
+          <div id="player-roster" class="roster">
+            <h4>Players in this game</h4>
+            <ul id="player-roster-list"></ul>
+          </div>
         </div>
       </section>
 
@@ -85,8 +89,31 @@
 
         <div id="host-players" class="card hidden">
           <h3>Players</h3>
+          <div id="role-randomiser">
+            <h4>Randomise roles</h4>
+            <p class="hint">
+              Enter one role per line (duplicates allowed) and assign them randomly
+              across the joined players.
+            </p>
+            <form id="role-randomiser-form">
+              <label for="role-pool" class="sr-only">Roles to assign</label>
+              <textarea
+                id="role-pool"
+                rows="4"
+                placeholder="Mafia
+Detective
+Doctor
+Villager"
+              ></textarea>
+              <div class="role-actions">
+                <button type="submit">Assign roles randomly</button>
+                <button type="button" id="clear-roles" class="secondary">Clear roles</button>
+              </div>
+            </form>
+            <p id="role-feedback" class="hint" aria-live="polite"></p>
+          </div>
           <p class="hint">
-            Assign roles and toggle life status. Changes are pushed instantly.
+            You can still tweak individual roles or life state below. Changes are pushed instantly.
           </p>
           <div id="players-list"></div>
         </div>
