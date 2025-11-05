@@ -33,6 +33,7 @@ const playerState = {
 const hostState = {
   code: null,
   secret: null,
+  players: [],
 };
 
 function uppercaseCode(value) {
@@ -189,7 +190,8 @@ function connectHostStream() {
   hostEventSource.addEventListener('session_update', (event) => {
     try {
       const data = JSON.parse(event.data);
-      renderPlayers(data.players || []);
+      hostState.players = Array.isArray(data.players) ? data.players : [];
+      renderPlayers();
     } catch (err) {
       console.error('Failed to parse host event', err);
     }
@@ -242,6 +244,10 @@ if (roleForm) {
         return;
       }
       const result = await response.json().catch(() => ({ ok: true }));
+      if (Array.isArray(result.players)) {
+        hostState.players = result.players;
+        renderPlayers();
+      }
       if (roleFeedback) {
         if (typeof result.assigned === 'number') {
           roleFeedback.textContent = `Assigned ${result.assigned} role${
@@ -278,8 +284,9 @@ function parseRolePool(value) {
 }
 
 function renderPlayers(players) {
+  const list = Array.isArray(players) ? players : hostState.players;
   playersList.innerHTML = '';
-  if (!players || players.length === 0) {
+  if (!list || list.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'hint';
     empty.textContent = 'Waiting for players to join.';
@@ -287,7 +294,7 @@ function renderPlayers(players) {
     return;
   }
 
-  players.forEach((player) => {
+  list.forEach((player) => {
     const row = document.createElement('div');
     row.className = 'player-row';
 
@@ -368,6 +375,12 @@ async function updateRole(playerId, roleValue) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unable to update role.' }));
       hostError.textContent = error.error || 'Unable to update role.';
+      return;
+    }
+    const result = await response.json().catch(() => ({ ok: true }));
+    if (Array.isArray(result.players)) {
+      hostState.players = result.players;
+      renderPlayers();
     }
   } catch (err) {
     console.error(err);
@@ -391,6 +404,15 @@ async function updateAlive(playerId, alive) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unable to update player.' }));
       hostError.textContent = error.error || 'Unable to update player.';
+      return;
+    }
+    const result = await response.json().catch(() => ({ ok: true }));
+    if (result && result.player) {
+      const index = hostState.players.findIndex((player) => player.id === result.player.id);
+      if (index !== -1) {
+        hostState.players[index] = result.player;
+        renderPlayers();
+      }
     }
   } catch (err) {
     console.error(err);

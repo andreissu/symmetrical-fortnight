@@ -60,15 +60,19 @@ function broadcastRoster(session) {
   }
 }
 
+function getHostPlayers(session) {
+  return Array.from(session.players.values()).map((player) => ({
+    id: player.id,
+    name: player.name,
+    role: player.role,
+    alive: player.alive,
+  }));
+}
+
 function broadcastHost(session) {
   const payload = {
     code: session.code,
-    players: Array.from(session.players.values()).map((player) => ({
-      id: player.id,
-      name: player.name,
-      role: player.role,
-      alive: player.alive,
-    })),
+    players: getHostPlayers(session),
   };
   for (const res of session.hostClients) {
     sendSSE(res, 'session_update', payload);
@@ -213,10 +217,12 @@ async function handleApi(req, res, parsedUrl) {
             updated = true;
             broadcastPlayer(session, player.id);
           }
+          let responsePlayers = null;
           if (updated) {
             broadcastHost(session);
+            responsePlayers = getHostPlayers(session);
           }
-          sendJson(res, 200, { ok: true });
+          sendJson(res, 200, { ok: true, players: responsePlayers });
           return;
         }
 
@@ -252,7 +258,11 @@ async function handleApi(req, res, parsedUrl) {
           broadcastPlayer(session, player.id);
         });
         broadcastHost(session);
-        sendJson(res, 200, { ok: true, assigned: Math.min(rolePool.length, players.length) });
+        sendJson(res, 200, {
+          ok: true,
+          assigned: Math.min(rolePool.length, players.length),
+          players: getHostPlayers(session),
+        });
       } catch (err) {
         sendJson(res, 400, { error: 'Invalid JSON body' });
       }
@@ -280,7 +290,15 @@ async function handleApi(req, res, parsedUrl) {
           player.alive = body.alive;
           broadcastHost(session);
           broadcastPlayer(session, player.id);
-          sendJson(res, 200, { ok: true });
+          sendJson(res, 200, {
+            ok: true,
+            player: {
+              id: player.id,
+              name: player.name,
+              role: player.role,
+              alive: player.alive,
+            },
+          });
         } catch (err) {
           sendJson(res, 400, { error: 'Invalid JSON body' });
         }
